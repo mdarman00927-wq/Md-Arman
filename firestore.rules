@@ -1,0 +1,267 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isValidId(id) { 
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
+    }
+    
+    function isSignedIn() { 
+      return request.auth != null; 
+    }
+    
+    function isOwner(ownerId) { 
+      return isSignedIn() && request.auth.uid == ownerId; 
+    }
+
+    // Task Validation
+    function isValidTask(data) {
+      return data.keys().hasAll(['id', 'title', 'completed', 'priority', 'category', 'ownerId'])
+        && data.keys().size() <= 16
+        && data.id is string && data.id.size() <= 128
+        && data.title is string && data.title.size() > 0 && data.title.size() <= 200
+        && data.completed is bool
+        && data.priority is string && (data.priority == 'low' || data.priority == 'medium' || data.priority == 'high')
+        && data.category is string && data.category.size() <= 100
+        && data.ownerId == request.auth.uid
+        && (!data.keys().hasAny(['details']) || (data.details is string && data.details.size() <= 2000))
+        && (!data.keys().hasAny(['location']) || (data.location is string && data.location.size() <= 500))
+        && (!data.keys().hasAny(['folder']) || (data.folder is string && data.folder.size() <= 200))
+        && (!data.keys().hasAny(['dueDate']) || (data.dueDate is string && data.dueDate.size() <= 100))
+        && (!data.keys().hasAny(['dueTime']) || (data.dueTime is string && data.dueTime.size() <= 100))
+        && (!data.keys().hasAny(['tags']) || data.tags is list)
+        && (!data.keys().hasAny(['subtasks']) || data.subtasks is list)
+        && (!data.keys().hasAny(['recurrence']) || data.recurrence is map);
+    }
+
+    // Note Validation
+    function isValidNote(data) {
+      return data.keys().hasAll(['id', 'title', 'content', 'color', 'ownerId', 'updatedAt'])
+        && data.keys().size() <= 12
+        && data.id is string && data.id.size() <= 128
+        && data.title is string && data.title.size() <= 200
+        && data.content is string && data.content.size() <= 10000
+        && data.color is string && data.color.size() <= 50
+        && data.ownerId == request.auth.uid
+        && (!data.keys().hasAny(['tags']) || data.tags is list)
+        && (!data.keys().hasAny(['pinned']) || data.pinned is bool)
+        && (!data.keys().hasAny(['category']) || (data.category is string && data.category.size() <= 100));
+    }
+
+    // User Profile Validation
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['uid', 'email', 'displayName'])
+        && data.keys().size() <= 12
+        && data.uid == request.auth.uid
+        && (data.email == null || (data.email is string && data.email.size() <= 256))
+        && (data.displayName is string && data.displayName.size() <= 256)
+        && (!data.keys().hasAny(['theme']) || (data.theme is string && data.theme.size() <= 50))
+        && (!data.keys().hasAny(['photoURL']) || (data.photoURL == null || (data.photoURL is string && data.photoURL.size() <= 1024)))
+        && (!data.keys().hasAny(['createdAt']) || (data.createdAt is string && data.createdAt.size() <= 100))
+        && (!data.keys().hasAny(['notificationSettings']) || data.notificationSettings is map);
+    }
+
+    // SharedFile Validation (Cloudinary Media Metadata)
+    function isValidSharedFile(data) {
+      return data.keys().hasAll(['id', 'uid', 'fileName', 'fileType', 'fileUrl', 'cloudinaryPublicId', 'createdAt'])
+        && data.keys().size() == 7
+        && data.id is string && data.id.size() <= 128
+        && data.uid == request.auth.uid
+        && data.fileName is string && data.fileName.size() <= 500
+        && data.fileType is string && (data.fileType == 'image' || data.fileType == 'video' || data.fileType == 'pdf' || data.fileType == 'other')
+        && data.fileUrl is string && data.fileUrl.size() <= 2048
+        && data.cloudinaryPublicId is string && data.cloudinaryPublicId.size() <= 1024
+        && data.createdAt is string && data.createdAt.size() <= 100;
+    }
+
+    // Notification Validation
+    function isValidNotification(data) {
+      return data.keys().hasAll(['id', 'title', 'body', 'type', 'read', 'ownerId', 'createdAt'])
+        && data.keys().size() <= 10
+        && data.id is string && data.id.size() <= 128
+        && data.title is string && data.title.size() <= 200
+        && data.body is string && data.body.size() <= 1000
+        && data.type is string && (data.type == 'system' || data.type == 'task' || data.type == 'focus' || data.type == 'reminder')
+        && data.read is bool
+        && data.ownerId == request.auth.uid
+        && (!data.keys().hasAny(['targetId']) || (data.targetId is string && data.targetId.size() <= 128));
+    }
+
+    // Settings Validation
+    function isValidSettings(data) {
+      return data.keys().hasAll(['id', 'ownerId'])
+        && data.keys().size() <= 10
+        && data.id is string && data.id.size() <= 128
+        && data.ownerId == request.auth.uid
+        && (!data.keys().hasAny(['theme']) || (data.theme is string && data.theme.size() <= 50))
+        && (!data.keys().hasAny(['enablePush']) || data.enablePush is bool)
+        && (!data.keys().hasAny(['dueDateReminders']) || data.dueDateReminders is bool)
+        && (!data.keys().hasAny(['focusAlerts']) || data.focusAlerts is bool)
+        && (!data.keys().hasAny(['soundAlerts']) || data.soundAlerts is bool)
+        && (!data.keys().hasAny(['dueDateThreshold']) || (data.dueDateThreshold is string && data.dueDateThreshold.size() <= 50));
+    }
+
+    // Analytics Validation
+    function isValidAnalytics(data) {
+      return data.keys().hasAll(['id', 'ownerId'])
+        && data.keys().size() <= 10
+        && data.id is string && data.id.size() <= 128
+        && data.ownerId == request.auth.uid
+        && (!data.keys().hasAny(['focusMinutesToday']) || data.focusMinutesToday is int)
+        && (!data.keys().hasAny(['totalFocusSessions']) || data.totalFocusSessions is int)
+        && (!data.keys().hasAny(['productivityScore']) || data.productivityScore is int)
+        && (!data.keys().hasAny(['updatedAt']) || (data.updatedAt is string && data.updatedAt.size() <= 100));
+    }
+
+    // Onboarding Validation
+    function isValidOnboarding(data) {
+      return data.keys().hasAll(['userId'])
+        && data.keys().size() <= 10
+        && data.userId == request.auth.uid
+        && (!data.keys().hasAny(['step1Completed']) || data.step1Completed is bool)
+        && (!data.keys().hasAny(['step2Completed']) || data.step2Completed is bool)
+        && (!data.keys().hasAny(['step3Completed']) || data.step3Completed is bool)
+        && (!data.keys().hasAny(['step4Completed']) || data.step4Completed is bool)
+        && (!data.keys().hasAny(['step5Completed']) || data.step5Completed is bool)
+        && (!data.keys().hasAny(['collapsed']) || data.collapsed is bool)
+        && (!data.keys().hasAny(['completedAt']) || (data.completedAt is string && data.completedAt.size() <= 100));
+    }
+
+    // Diagnostics connection test document path
+    match /test/connection {
+      allow read: if true;
+    }
+
+    // Col 1: /tasks/
+    match /tasks/{taskId} {
+      allow get: if isOwner(resource.data.ownerId);
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() 
+                    && isValidId(taskId) 
+                    && isValidTask(request.resource.data);
+      allow update: if isSignedIn() 
+                    && isValidTask(request.resource.data) 
+                    && isOwner(resource.data.ownerId)
+                    && request.resource.data.ownerId == resource.data.ownerId;
+      allow delete: if isOwner(resource.data.ownerId);
+    }
+
+    // Col 2: /notes/
+    match /notes/{noteId} {
+      allow get: if isOwner(resource.data.ownerId);
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() 
+                    && isValidId(noteId) 
+                    && isValidNote(request.resource.data);
+      allow update: if isSignedIn() 
+                    && isValidNote(request.resource.data) 
+                    && isOwner(resource.data.ownerId)
+                    && request.resource.data.ownerId == resource.data.ownerId;
+      allow delete: if isOwner(resource.data.ownerId);
+    }
+
+    // Col 3: /users/
+    match /users/{userId} {
+      allow read: if isSignedIn() && userId == request.auth.uid;
+      allow create: if isSignedIn() 
+                    && isValidId(userId) 
+                    && userId == request.auth.uid
+                    && isValidUserProfile(request.resource.data);
+      allow update: if isSignedIn() 
+                    && isValidId(userId) 
+                    && userId == request.auth.uid
+                    && isValidUserProfile(request.resource.data);
+      allow delete: if isOwner(userId);
+    }
+
+    // Col 10: /users/{userId}/onboarding/
+    match /users/{userId}/onboarding/{onboardingId} {
+      allow get: if isSignedIn() && userId == request.auth.uid;
+      allow list: if isSignedIn() && userId == request.auth.uid;
+      allow create: if isSignedIn() 
+                    && userId == request.auth.uid 
+                    && isValidId(onboardingId) 
+                    && isValidOnboarding(request.resource.data);
+      allow update: if isSignedIn() 
+                    && userId == request.auth.uid 
+                    && isValidId(onboardingId) 
+                    && isValidOnboarding(request.resource.data);
+      allow delete: if isSignedIn() && userId == request.auth.uid;
+    }
+
+    // Col 9: /files/
+    match /files/{fileId} {
+      allow get: if isSignedIn() && resource.data.uid == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.uid == request.auth.uid;
+      allow create: if isSignedIn() 
+                    && isValidId(fileId) 
+                    && isValidSharedFile(request.resource.data);
+      allow update: if isSignedIn() 
+                    && isValidSharedFile(request.resource.data) 
+                    && isOwner(resource.data.uid)
+                    && request.resource.data.uid == resource.data.uid;
+      allow delete: if isOwner(resource.data.uid);
+    }
+
+    // Col 4: /notifications/
+    match /notifications/{notificationId} {
+      allow get: if isOwner(resource.data.ownerId);
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() 
+                    && isValidId(notificationId) 
+                    && isValidNotification(request.resource.data);
+      allow update: if isSignedIn() 
+                    && isValidNotification(request.resource.data) 
+                    && isOwner(resource.data.ownerId)
+                    && request.resource.data.ownerId == resource.data.ownerId;
+      allow delete: if isOwner(resource.data.ownerId);
+    }
+
+    // Col 5: /settings/
+    match /settings/{settingsId} {
+      allow get: if isSignedIn() && settingsId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() 
+                    && isValidId(settingsId) 
+                    && settingsId == request.auth.uid
+                    && isValidSettings(request.resource.data);
+      allow update: if isSignedIn() 
+                    && isValidSettings(request.resource.data) 
+                    && settingsId == request.auth.uid
+                    && request.resource.data.ownerId == request.auth.uid;
+      allow delete: if isSignedIn() && settingsId == request.auth.uid;
+    }
+
+    // Col 6: /analytics/
+    match /analytics/{analyticsId} {
+      allow get: if isSignedIn() && analyticsId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() 
+                    && isValidId(analyticsId) 
+                    && analyticsId == request.auth.uid
+                    && isValidAnalytics(request.resource.data);
+      allow update: if isSignedIn() 
+                    && isValidAnalytics(request.resource.data) 
+                    && analyticsId == request.auth.uid
+                    && request.resource.data.ownerId == request.auth.uid;
+      allow delete: if isSignedIn() && analyticsId == request.auth.uid;
+    }
+
+    // Col 7: /support_messages/
+    match /support_messages/{messageId} {
+      allow create: if true; // Open creation for contact submissions
+      allow read, update, delete: if false; // Denied to ordinary public keys
+    }
+
+    // Col 8: /deletion_requests/
+    match /deletion_requests/{requestId} {
+      allow create: if true; // Open creation for deletion submissions
+      allow read, update, delete: if false; // Denied to ordinary public keys
+    }
+  }
+}

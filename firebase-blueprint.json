@@ -1,0 +1,167 @@
+{
+  "entities": {
+    "Task": {
+      "title": "Task",
+      "description": "Represents a task or todo item created by a user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "details": { "type": "string" },
+        "completed": { "type": "boolean" },
+        "priority": { "type": "string", "enum": ["low", "medium", "high"] },
+        "dueDate": { "type": "string" },
+        "dueTime": { "type": "string" },
+        "category": { "type": "string" },
+        "location": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "title", "completed", "priority", "category", "ownerId"]
+    },
+    "Note": {
+      "title": "Note",
+      "description": "Represents a custom text note with styling and tags",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "color": { "type": "string" },
+        "tags": { "type": "array" },
+        "ownerId": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "pinned": { "type": "boolean" },
+        "category": { "type": "string" }
+      },
+      "required": ["id", "title", "content", "color", "ownerId", "updatedAt"]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile metadata",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "theme": { "type": "string", "enum": ["light", "dark"] },
+        "notificationSettings": { "type": "object" }
+      },
+      "required": ["uid", "email", "displayName"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "An in-app notification alert, reminder, or focus ticker event",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "type": { "type": "string", "enum": ["system", "task", "focus", "reminder"] },
+        "read": { "type": "boolean" },
+        "ownerId": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "targetId": { "type": "string" }
+      },
+      "required": ["id", "title", "body", "type", "read", "ownerId", "createdAt"]
+    },
+    "Settings": {
+      "title": "Settings",
+      "description": "User personalization and application settings",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "theme": { "type": "string" },
+        "enablePush": { "type": "boolean" },
+        "dueDateReminders": { "type": "boolean" },
+        "focusAlerts": { "type": "boolean" },
+        "soundAlerts": { "type": "boolean" },
+        "dueDateThreshold": { "type": "string" }
+      },
+      "required": ["id", "ownerId"]
+    },
+    "Analytics": {
+      "title": "Analytics",
+      "description": "User focus session statistics and performance telemetry",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "focusMinutesToday": { "type": "integer" },
+        "totalFocusSessions": { "type": "integer" },
+        "productivityScore": { "type": "integer" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "ownerId"]
+    },
+    "SharedFile": {
+      "title": "SharedFile",
+      "description": "Metadata for files uploaded by users to Cloudinary and shared",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "uid": { "type": "string" },
+        "fileName": { "type": "string" },
+        "fileType": { "type": "string" },
+        "fileUrl": { "type": "string" },
+        "cloudinaryPublicId": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "uid", "fileName", "fileType", "fileUrl", "cloudinaryPublicId", "createdAt"]
+    },
+    "Onboarding": {
+      "title": "Onboarding",
+      "description": "Represents the user onboarding checklist status",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "step1Completed": { "type": "boolean" },
+        "step2Completed": { "type": "boolean" },
+        "step3Completed": { "type": "boolean" },
+        "step4Completed": { "type": "boolean" },
+        "step5Completed": { "type": "boolean" },
+        "collapsed": { "type": "boolean" },
+        "completedAt": { "type": "string" }
+      },
+      "required": ["userId"]
+    }
+  },
+  "firestore": {
+    "/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "User tasks"
+    },
+    "/notes/{noteId}": {
+      "schema": "Note",
+      "description": "User notes"
+    },
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile data"
+    },
+    "/users/{userId}/onboarding/{onboardingId}": {
+      "schema": "Onboarding",
+      "description": "User onboarding checklist progress"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "User notifications"
+    },
+    "/settings/{settingsId}": {
+      "schema": "Settings",
+      "description": "User notification and display settings"
+    },
+    "/analytics/{analyticsId}": {
+      "schema": "Analytics",
+      "description": "User work metrics and efficiency data"
+    },
+    "/files/{fileId}": {
+      "schema": "SharedFile",
+      "description": "Metadata for user uploaded and shared files"
+    }
+  }
+}

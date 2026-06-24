@@ -1,0 +1,10 @@
+{
+  "name": "Remix: NexTask",
+  "description": "A modern, mobile-optimized task organizer with integrated notes and personalized dashboard.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
