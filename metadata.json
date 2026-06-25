@@ -1,5 +1,5 @@
 {
-  "name": "Remix: NexTask",
+  "name": "NexTask",
   "description": "A modern, mobile-optimized task organizer with integrated notes and personalized dashboard.",
   "requestFramePermissions": [
     "microphone"

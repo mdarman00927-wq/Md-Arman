@@ -105,7 +105,7 @@ export default function Settings({
   // Admin Panel State Controls
   const [adminUsers, setAdminUsers] = useState([
     { uid: 'demo-user-alex', displayName: 'Alex Johnson', email: 'demo@nextask.com', isPremium: false, banned: false, role: 'User' },
-    { uid: 'admin-md-arman', displayName: 'MD Arman', email: 'mdarman000732@gmail.com', isPremium: true, banned: false, role: 'Chief Architect' },
+    { uid: 'admin-nextask', displayName: 'MD Arman', email: 'mdarman000732@gmail.com', isPremium: true, banned: false, role: 'Chief Architect' },
     { uid: 'user-sarah-k', displayName: 'Sarah Connor', email: 'sarah.k@gmail.com', isPremium: true, banned: false, role: 'User' },
     { uid: 'user-bob-v', displayName: 'Bob Vance', email: 'bob@dundermifflin.com', isPremium: false, banned: true, role: 'User' }
   ]);
