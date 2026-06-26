@@ -2,8 +2,8 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { AppNotification, NotificationSettings, Task } from '../types';
 import { useAuth } from './AuthContext';
 import { notificationService, settingsService } from './dataService';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db, isFirebaseConfigured, shouldUseFirebase } from './firebase';
+import { doc, setDoc } from 'firebase/firestore';
+import { db, shouldUseFirebase } from './firebase';
 
 interface NotificationContextProps {
   notifications: AppNotification[];
@@ -34,9 +34,15 @@ export function NotificationProvider({ children, tasks }: { children: React.Reac
   const { user } = useAuth();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [settings, setSettings] = useState<NotificationSettings>(DEFAULT_SETTINGS);
-  const [permissionStatus, setPermissionStatus] = useState<NotificationPermission>(
-    typeof window !== 'undefined' ? Notification.permission : 'default'
-  );
+  
+  // Safe permission status checking for browser compatibility (strictly disabled for this build)
+  const [permissionStatus, setPermissionStatus] = useState<NotificationPermission>(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      // Return 'denied' to disable push notifications completely
+      return 'denied';
+    }
+    return 'denied';
+  });
   
   // Track notified tasks to prevent double alerts
   const alertedTasksRef = useRef<Record<string, boolean>>({});
@@ -59,7 +65,7 @@ export function NotificationProvider({ children, tasks }: { children: React.Reac
       try {
         const cloudSettings = await settingsService.fetchSettings(user!.uid);
         setSettings({
-          enablePush: cloudSettings.enablePush,
+          enablePush: false, // strictly disabled
           dueDateReminders: cloudSettings.dueDateReminders,
           focusAlerts: cloudSettings.focusAlerts,
           soundAlerts: cloudSettings.soundAlerts,
@@ -69,7 +75,11 @@ export function NotificationProvider({ children, tasks }: { children: React.Reac
         console.warn("Could not fetch cloud settings via service wrapper, falling back to local storage:", e);
         const local = localStorage.getItem(`notif_settings_${user!.uid}`);
         if (local) {
-          setSettings(JSON.parse(local));
+          const parsed = JSON.parse(local);
+          setSettings({
+            ...parsed,
+            enablePush: false // strictly disabled
+          });
         } else {
           setSettings(DEFAULT_SETTINGS);
         }
@@ -79,30 +89,17 @@ export function NotificationProvider({ children, tasks }: { children: React.Reac
     initUserNotifications();
   }, [user]);
 
-  // Request browser desktop notifications permission
+  // Request browser desktop notifications permission (completely disabled)
   const requestPermission = async (): Promise<boolean> => {
-    if (typeof window === 'undefined' || !('Notification' in window)) return false;
-    
-    try {
-      const status = await Notification.requestPermission();
-      setPermissionStatus(status);
-      if (status === 'granted') {
-        await updateSettings({ enablePush: true });
-        return true;
-      } else {
-        await updateSettings({ enablePush: false });
-        return false;
-      }
-    } catch (err) {
-      console.error("Failed requesting browser notification guidelines:", err);
-      return false;
-    }
+    // Silently skip browser notification registration
+    setPermissionStatus('denied');
+    return false;
   };
 
   // Update Settings (Both locally or in cloud store)
   const updateSettings = async (newSettings: Partial<NotificationSettings>) => {
     if (!user) return;
-    const updated = { ...settings, ...newSettings };
+    const updated = { ...settings, ...newSettings, enablePush: false }; // push is strictly disabled
     setSettings(updated);
 
     // Persist to local cache immediately
@@ -119,7 +116,7 @@ export function NotificationProvider({ children, tasks }: { children: React.Reac
           id: user.uid,
           ownerId: user.uid,
           theme: 'light',
-          enablePush: updated.enablePush,
+          enablePush: false,
           dueDateReminders: updated.dueDateReminders,
           focusAlerts: updated.focusAlerts,
           soundAlerts: updated.soundAlerts,
@@ -160,7 +157,7 @@ export function NotificationProvider({ children, tasks }: { children: React.Reac
     }
   };
 
-  // Core trigger for in-app and native push alarms
+  // Core trigger for in-app alarms (native push disabled)
   const triggerNotification = async (
     title: string,
     body: string,
@@ -190,17 +187,8 @@ export function NotificationProvider({ children, tasks }: { children: React.Reac
     // Audio chime trigger
     playSynthesizedChime();
 
-    // Trigger Browser Push Notification if authorized
-    if (settings.enablePush && permissionStatus === 'granted' && typeof window !== 'undefined') {
-      try {
-        new Notification(title, {
-          body,
-          icon: '/favicon.ico',
-        });
-      } catch (err) {
-        console.warn("Could not dispatch native push alert:", err);
-      }
-    }
+    // Browser native Push Notification is disabled as requested.
+    // Silently skipping any browser Notification API construction.
   };
 
   const triggerFocusComplete = async (mode: 'focus' | 'short-break' | 'long-break') => {
@@ -300,7 +288,7 @@ export function NotificationProvider({ children, tasks }: { children: React.Reac
             // Check if alert has already triggered for this key
             if (!alertedTasksRef.current[alertKey]) {
               alertedTasksRef.current[alertKey] = true;
-
+  
               // Dispatch Alert
               const warningTimeStr = thresholdOffset === 0 
                 ? 'is due right now!' 
